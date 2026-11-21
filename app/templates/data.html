@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Data — {{ instance.name }}{% endblock %}
+{% block body %}
+<h1>Training data</h1>
+<p class="lede">{{ instance.name }} &middot; <span class="mono">{{ instance.slug }}</span></p>
+
+<p><a class="btn" href="/admin/instances/{{ instance.id }}">&larr; Back to the instance</a></p>
+
+<div class="card tight">
+  <p class="dim" style="margin:0">
+    Live instance right now: {{ counts.customers }} customers &middot;
+    {{ counts.applications }} applications &middot; {{ counts.loans }} loans &middot;
+    {{ counts.payments }} payments.
+    &nbsp; Download:
+    <a href="/admin/instances/{{ instance.id }}/data.json?which=seed">seed snapshot</a> &middot;
+    <a href="/admin/instances/{{ instance.id }}/data.json?which=live">live data</a>
+  </p>
+</div>
+
+<h2>Edit the dataset</h2>
+<p class="dim">This JSON is the instance's <b>seed snapshot</b> — the state that "Reset data"
+restores. Edit it to make the training data match your own book: rename products, use your
+states, set realistic loan sizes, add a customer with a deliberately low credit score.</p>
+
+<form method="post" action="/admin/instances/{{ instance.id }}/data" class="card">
+  <textarea name="payload" rows="26" spellcheck="false">{{ dataset_json }}</textarea>
+  <div class="row" style="margin-top:14px">
+    <button class="primary" name="mode" value="seed" type="submit">Save as the seed snapshot</button>
+    <button name="mode" value="live" type="submit"
+            onclick="return confirm('Apply this data to the live instance now, and make it the snapshot?')">
+      Save and apply to the live instance</button>
+    <a class="btn" href="/admin/instances/{{ instance.id }}/data">Discard changes</a>
+  </div>
+  <p class="dim" style="margin-top:12px">Nothing is saved unless the JSON parses <i>and</i> every
+  reference resolves — a payment must point at a real loan, a loan at a real customer.</p>
+</form>
+
+<h2>The shape</h2>
+<pre class="snippet">{
+  "customers": [
+    { "id": "CUS-100001", "first_name": "Margaret", "surname": "Whitfield",
+      "dob": "1978-04-12", "email": "m.whitfield@example.com", "mobile": "+61400111222",
+      "state": "NSW", "employment": "PAYG", "annual_income": 142000,
+      "credit_score": 812, "created_at": "2024-03-11" }
+  ],
+  "applications": [
+    { "id": "APP-2026-000411", "customer_id": "CUS-100001",
+      "product": "Fixed Rate Home Loan", "amount": 620000, "term_months": 360,
+      "rate_pct": 6.14, "purpose": "Purchase", "status": "APPROVED",
+      "submitted_at": "2026-11-14T09:12:00+11:00", "decision_at": null, "assessor": null }
+  ],
+  "loans": [
+    { "id": "LON-90001", "application_id": "APP-2026-000411", "customer_id": "CUS-100001",
+      "product": "Fixed Rate Home Loan", "original_amount": 620000, "balance": 598412.77,
+      "rate_pct": 6.14, "term_months": 360, "payments_made": 4,
+      "next_payment_due": "2026-12-01", "repayment_frequency": "MONTHLY",
+      "repayment_amount": 3775.41, "status": "CURRENT", "opened_at": "2026-07-01",
+      "arrears_days": 0 }
+  ],
+  "payments": [
+    { "id": "PAY-500001", "loan_id": "LON-90001", "amount": 3775.41,
+      "paid_at": "2026-11-01T09:00:00+11:00", "method": "DIRECT_DEBIT",
+      "reference": "DD NOV", "reversed": false }
+  ]
+}</pre>
+<p class="dim">Statuses the API understands — applications:
+  <span class="mono">SUBMITTED · IN_REVIEW · REFERRED · APPROVED · DECLINED</span>;
+  loans: <span class="mono">CURRENT · ARREARS · CLOSED</span>;
+  repayment frequencies: <span class="mono">MONTHLY · FORTNIGHTLY · WEEKLY</span>.</p>
+
+<h3>Keep the exercises working</h3>
+<ul class="tight dim">
+  <li>Include at least one application that is already <span class="mono">APPROVED</span> — the
+      workbook uses it to demonstrate a <span class="mono">409</span>.</li>
+  <li>Include a loan with a <b>small balance</b> (a few thousand) so the "payment larger than the
+      balance" exercise returns <span class="mono">422</span> rather than succeeding.</li>
+  <li>Include a loan with <span class="mono">arrears_days</span> above zero, so
+      <span class="mono">?in_arrears=true</span> returns something.</li>
+  <li>Five or more customers, so pagination with <span class="mono">page_size=2</span> has several pages.</li>
+</ul>
+{% endblock %}

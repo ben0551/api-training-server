@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}{{ instance.name }}{% endblock %}
+{% block body %}
+<div class="between">
+  <div>
+    <h1>{{ instance.name }}</h1>
+    <p class="lede">{{ instance.description or 'No description' }}</p>
+  </div>
+  <a class="btn" href="/admin">All instances</a>
+</div>
+
+<p>
+  {% if instance.archived %}<span class="tag bad">archived — URL returns 404</span>{% endif %}
+  {% if instance.read_only %}<span class="tag warn">frozen — writes return 403</span>{% endif %}
+  {% if not instance.archived and not instance.read_only %}<span class="tag ok">live</span>{% endif %}
+  <span class="tag teal">preset: {{ instance.preset }}</span>
+  {% if instance.auto_reset_hours %}<span class="tag">auto-reset every {{ instance.auto_reset_hours }}h</span>{% endif %}
+  {% if instance.show_keys %}<span class="tag">keys public</span>{% else %}<span class="tag warn">keys hidden</span>{% endif %}
+</p>
+
+<h2>Hand this to participants</h2>
+<div class="card">
+  <div class="between">
+    <div>
+      <div class="dim">Base URL — paste into Postman's <span class="mono">baseUrl</span> variable</div>
+      <div class="copy">{{ base_url }}</div>
+    </div>
+    <div>
+      <div class="dim">Share page — one link with the URL and keys</div>
+      <div class="copy">{{ base_url }}</div>
+    </div>
+  </div>
+  <p class="dim" style="margin-top:14px">
+    <a href="{{ base_url }}" target="_blank">Open the share page</a> &middot;
+    <a href="{{ base_url }}/docs" target="_blank">API documentation</a> &middot;
+    <a href="{{ base_url }}/health" target="_blank">Health check</a> &middot;
+    <a href="/admin/instances/{{ instance.id }}/keys">Manage keys</a> &middot;
+    <a href="/admin/instances/{{ instance.id }}/data">Edit the data</a>
+  </p>
+</div>
+
+<h2>Data</h2>
+<div class="grid">
+  <div class="stat"><b>{{ counts.customers }}</b><span>customers</span></div>
+  <div class="stat"><b>{{ counts.applications }}</b><span>applications</span></div>
+  <div class="stat"><b>{{ counts.loans }}</b><span>loans</span></div>
+  <div class="stat"><b>{{ counts.payments }}</b><span>payments</span></div>
+</div>
+<p class="dim">Last reset: {{ instance.last_reset_at[:16].replace('T',' ') }} &middot;
+   {{ audit|length }} recent requests &middot;
+   seed snapshot: {{ counts.customers }} customers</p>
+
+<h2>Actions</h2>
+<div class="card">
+  <form method="post" action="/admin/instances/{{ instance.id }}/action" class="row"
+        onsubmit="return confirm(this.dataset.confirm || 'Are you sure?')" data-confirm="">
+    <button name="action" value="reset" class="primary"
+            onclick="this.form.dataset.confirm='Reset the data? New applications, payments and idempotency keys will be lost.'">
+      Reset data to the snapshot</button>
+    <button name="action" value="snapshot"
+            onclick="this.form.dataset.confirm='Save the CURRENT data as the new snapshot? Reset will then restore to this state.'">
+      Snapshot current data</button>
+    <button name="action" value="reseed"
+            onclick="this.form.dataset.confirm='Regenerate the preset dataset from scratch?'">
+      Regenerate the preset</button>
+    <button name="action" value="clear_audit"
+            onclick="this.form.dataset.confirm='Clear the request log?'">Clear request log</button>
+    <button name="action" value="new_secret"
+            onclick="this.form.dataset.confirm='Issue a new OAuth client secret? Anything using the old one breaks.'">
+      New client secret</button>
+    {% if instance.read_only %}
+      <button name="action" value="unfreeze">Unfreeze (allow writes)</button>
+    {% else %}
+      <button name="action" value="freeze"
+              onclick="this.form.dataset.confirm='Freeze into read-only mode? Every write returns 403.'">
+        Freeze (read-only)</button>
+    {% endif %}
+    <button name="action" value="toggle_keys_page">
+      {% if instance.show_keys %}Hide keys on the share page{% else %}Show keys on the share page{% endif %}</button>
+    {% if instance.archived %}
+      <button name="action" value="unarchive">Restore</button>
+    {% else %}
+      <button name="action" value="archive"
+              onclick="this.form.dataset.confirm='Archive? The URL will start returning 404. Data is kept.'">
+        Archive</button>
+    {% endif %}
+    <button name="action" value="delete" class="danger"
+            onclick="this.form.dataset.confirm='DELETE this instance and all of its data? This cannot be undone.'">
+      Delete permanently</button>
+  </form>
+  <p class="dim" style="margin-top:12px">OAuth client secret:
+    <span class="mono">{{ instance.client_secret }}</span></p>
+</div>
+
+<h2>Keys</h2>
+<table>
+  <tr><th>Label</th><th>Key</th><th>Scope</th><th>State</th><th>Last used</th></tr>
+  {% for k in keys %}
+  <tr>
+    <td>{{ k.label }}</td>
+    <td class="mono dim">{{ k.key }}</td>
+    <td>{% if k.scope == 'write' %}<span class="tag warn">write</span>{% else %}<span class="tag">read</span>{% endif %}</td>
+    <td>{% if k.enabled %}<span class="tag ok">enabled</span>{% else %}<span class="tag bad">disabled</span>{% endif %}</td>
+    <td class="dim">{{ (k.last_used_at or '—')[:16].replace('T',' ') }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p><a class="btn" href="/admin/instances/{{ instance.id }}/keys">Create or disable keys</a></p>
+
+<h2>Recent requests</h2>
+<table>
+  <tr><th>When</th><th>Method</th><th>Path</th><th>Key</th><th>Status</th></tr>
+  {% for r in audit %}
+  <tr>
+    <td class="dim">{{ r.at[11:19] }}</td>
+    <td class="mono">{{ r.method }}</td>
+    <td class="mono dim">{{ r.path }}</td>
+    <td class="dim">{{ r.key_label }}</td>
+    <td>{% if r.status < 300 %}<span class="tag ok">{{ r.status }}</span>
+        {% elif r.status < 500 %}<span class="tag warn">{{ r.status }}</span>
+        {% else %}<span class="tag bad">{{ r.status }}</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% if not audit %}<p class="dim">No requests yet. Send one from Postman and it will appear here.</p>{% endif %}
+{% endblock %}

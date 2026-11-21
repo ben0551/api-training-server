@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Training API console{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head><body>
+<header class="top"><div class="inner">
+  <div class="brand">LendFast <span>training API</span></div>
+  <nav>
+    <a href="/admin">Instances</a>
+    <a href="/admin/instances/new">New instance</a>
+    <a href="/admin/audit">Request log</a>
+    <a href="/admin/password">Password</a>
+    <a href="/admin/logout">Sign out</a>
+  </nav>
+</div></header>
+<div class="wrap">
+{% if flash %}<div class="msg ok">{{ flash }}</div>{% endif %}
+{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% block body %}{% endblock %}
+<footer>LendFast training API server &middot; every instance holds fictional data only</footer>
+</div></body></html>

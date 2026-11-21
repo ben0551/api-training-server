@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}New instance{% endblock %}
+{% block body %}
+<h1>Create a training instance</h1>
+<p class="lede">A new instance starts with the three standard training keys
+(<span class="mono">demo-key-001</span> read, <span class="mono">demo-key-002</span> write,
+<span class="mono">demo-key-003</span> read) so the course workbook and Postman collection work
+without edits.</p>
+
+<form method="post" action="/admin/instances" class="card">
+  <label for="name">Instance name</label>
+  <input type="text" id="name" name="name" required placeholder="e.g. Resimac — March 2026 cohort"
+         oninput="if(!document.getElementById('slugpeek').dataset.touched)document.getElementById('slugpeek').textContent=this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48)">
+  <p class="dim">Share URL will be <span class="mono" id="slugpeek">…</span> &nbsp;
+     <span class="dim">(made unique automatically)</span></p>
+
+  <label for="description">Description (optional)</label>
+  <input type="text" id="description" name="description" placeholder="Who it's for, when it runs">
+
+  <label for="preset">Starting data</label>
+  <select id="preset" name="preset">
+    {% for key, label in presets.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+  </select>
+
+  <label for="clone_from">Or clone the data from an existing instance (optional)</label>
+  <select id="clone_from" name="clone_from">
+    <option value="">— no, use the preset above —</option>
+    {% for i in instances %}<option value="{{ i.id }}">{{ i.name }} ({{ i.slug }})</option>{% endfor %}
+  </select>
+  <p class="dim">Cloning copies that instance's current data and its key set. Useful for a second
+  cohort that should see exactly the same starting point.</p>
+
+  <label for="auto_reset_hours">Automatically reset the data every…</label>
+  <select id="auto_reset_hours" name="auto_reset_hours">
+    <option value="0">never — keep the data until I reset it</option>
+    <option value="12">12 hours</option>
+    <option value="24">24 hours — recommended for a long-lived shared instance</option>
+    <option value="168">7 days</option>
+  </select>
+  <p class="dim">Auto-reset makes a long-lived instance self-cleaning: whatever a cohort leaves
+  behind is gone before the next one arrives.</p>
+
+  <label class="check"><input type="checkbox" name="persistent" value="1" checked>
+    Keep this instance across restarts</label>
+  <label class="check"><input type="checkbox" name="show_keys" value="1" checked>
+    Show the API keys on the participant share page</label>
+  <p class="dim">With this on, you can send participants a single link and they will find the base
+  URL and the keys themselves. Turn it off if the instance should stay private.</p>
+
+  <div class="row" style="margin-top:18px">
+    <button class="primary" type="submit">Create instance</button>
+    <a class="btn" href="/admin">Cancel</a>
+  </div>
+</form>
+{% endblock %}

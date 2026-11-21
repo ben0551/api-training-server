@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Request log</h1>
+<p class="lede">The most recent {{ rows|length }} authenticated API calls across every instance.
+This is what a participant sees in the <span class="mono">/v1/_audit</span> exercise, and what
+you look at when someone says "it worked for everyone else".</p>
+
+<table>
+  <tr><th>When</th><th>Instance</th><th>Method</th><th>Path</th><th>Key</th><th>Status</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td class="dim">{{ r.at[11:19] }}</td>
+    <td><a href="/admin/instances/{{ r.instance_id }}">{{ r.slug }}</a></td>
+    <td class="mono">{{ r.method }}</td>
+    <td class="mono dim">{{ r.path }}</td>
+    <td class="dim">{{ r.key_label }}</td>
+    <td>{% if r.status < 300 %}<span class="tag ok">{{ r.status }}</span>
+        {% elif r.status < 500 %}<span class="tag warn">{{ r.status }}</span>
+        {% else %}<span class="tag bad">{{ r.status }}</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% if not rows %}<p class="dim">Nothing logged yet.</p>{% endif %}
+{% endblock %}

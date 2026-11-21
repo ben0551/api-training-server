@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ instance.name }} &middot; training API</title>
+<link rel="stylesheet" href="/static/style.css">
+</head><body>
+<div class="wrap" style="max-width:820px">
+  <div class="brand" style="font-weight:700;font-size:20px;margin-top:26px">LendFast
+    <span style="color:var(--teal)">training API</span></div>
+  <h1>{{ instance.name }}</h1>
+  <p class="lede">{{ instance.description or 'A training sandbox for the API Fundamentals course.' }}</p>
+  {% if instance.read_only %}<div class="msg err">This instance is in read-only mode — writes will
+    be refused. Reading works normally.</div>{% endif %}
+
+  <h2>1. Your base URL</h2>
+  <div class="copy">{{ base_url }}</div>
+  <p class="dim">In Postman, open the <b>LendFast Sandbox</b> environment and set
+  <span class="mono">baseUrl</span> to the value above. Every request in the collection then
+  works — you do not need to change anything else.</p>
+
+  <h2>2. Check it is alive</h2>
+  <div class="copy">GET {{ base_url }}/health</div>
+  <p class="dim">You should get <span class="mono">200 OK</span> and
+  <span class="mono">"status": "ok"</span>.</p>
+
+  {% if keys %}
+  <h2>3. Your API keys</h2>
+  <table>
+    <tr><th>Key</th><th>Who it is</th><th>What it can do</th></tr>
+    {% for k in keys %}
+    <tr>
+      <td class="mono">{{ k.key }}</td>
+      <td>{{ k.label }}</td>
+      <td>{% if k.scope == 'write' %}<span class="tag warn">write</span> — GET, POST, PATCH
+          {% else %}<span class="tag">read</span> — GET only{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="dim">Send them in a header called <span class="mono">X-API-Key</span>.
+  {% if secret %}The OAuth client secret for this instance is
+  <span class="mono">{{ secret }}</span>{% endif %}</p>
+  {% else %}
+  <h2>3. Your API keys</h2>
+  <p class="dim">Keys for this instance are not listed here — ask your facilitator for them.</p>
+  {% endif %}
+
+  <h2>4. What is in here</h2>
+  <p class="dim">{{ counts.customers }} customers, {{ counts.applications }} loan applications,
+  {{ counts.loans }} booked loans and {{ counts.payments }} repayments. All of it is fictional.</p>
+
+  <h2>5. Documentation</h2>
+  <p><a class="btn primary" href="{{ base_url }}/docs">Open the API documentation</a></p>
+  <p class="dim">That page is generated from the API itself — every endpoint, with the ability to
+  try it. It is the same thing you would find for any internal API at work.</p>
+
+  <hr>
+  <p class="dim">This is a sandbox. Data resets{% if instance.auto_reset_hours %} automatically
+  every {{ instance.auto_reset_hours }} hours{% else %} whenever the facilitator resets it{% endif %},
+  and nothing here touches production. Break it as much as you like — that is the exercise.</p>
+  <footer>LendFast training API server &middot; API Fundamentals for Finance &amp; Lending</footer>
+</div></body></html>

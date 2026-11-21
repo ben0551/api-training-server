@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Keys — {{ instance.name }}{% endblock %}
+{% block body %}
+<h1>API keys</h1>
+<p class="lede">{{ instance.name }} &middot; <span class="mono">{{ base_url }}</span></p>
+
+<p><a class="btn" href="/admin/instances/{{ instance.id }}">&larr; Back to the instance</a></p>
+
+<table>
+  <tr><th>Label</th><th>Key</th><th>Scope</th><th>State</th><th>Created</th><th>Last used</th><th></th></tr>
+  {% for k in keys %}
+  <tr>
+    <td>{{ k.label }}</td>
+    <td class="mono">{{ k.key }}</td>
+    <td>{% if k.scope == 'write' %}<span class="tag warn">write</span>{% else %}<span class="tag">read</span>{% endif %}</td>
+    <td>{% if k.enabled %}<span class="tag ok">enabled</span>{% else %}<span class="tag bad">disabled</span>{% endif %}</td>
+    <td class="dim">{{ k.created_at[:10] }}</td>
+    <td class="dim">{{ (k.last_used_at or '—')[:16].replace('T',' ') }}</td>
+    <td>
+      <div class="row">
+        {% if k.enabled %}
+          <form method="post" action="/admin/instances/{{ instance.id }}/keys/{{ k.id }}/disable">
+            <button class="small" type="submit">Disable</button></form>
+        {% else %}
+          <form method="post" action="/admin/instances/{{ instance.id }}/keys/{{ k.id }}/enable">
+            <button class="small" type="submit">Enable</button></form>
+        {% endif %}
+        <form method="post" action="/admin/instances/{{ instance.id }}/keys/{{ k.id }}/delete"
+              onsubmit="return confirm('Delete this key? Anything using it stops working.')">
+          <button class="small danger" type="submit">Delete</button></form>
+      </div>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Create a key</h2>
+<form method="post" action="/admin/instances/{{ instance.id }}/keys" class="card">
+  <label for="label">Who or what is it for?</label>
+  <input type="text" id="label" name="label" required placeholder="e.g. Cohort B — read only">
+  <label for="scope">Scope</label>
+  <select id="scope" name="scope">
+    <option value="read">read — GET only (a write attempt returns 403)</option>
+    <option value="write">write — GET, POST and PATCH</option>
+  </select>
+  <label for="key">Key value (optional)</label>
+  <input type="text" id="key" name="key" placeholder="leave blank to generate one">
+  <p class="dim">A generated key looks like <span class="mono">tr_…</span>. Supply your own if you
+  want something easier to type in a classroom.</p>
+  <div style="margin-top:16px"><button class="primary" type="submit">Create key</button></div>
+</form>
+
+<p class="dim">Disabling a key takes effect immediately: requests using it get
+<span class="mono">401 API_KEY_DISABLED</span>. Keys are scoped to this instance only — the same
+key value in another instance is a different credential.</p>
+{% endblock %}

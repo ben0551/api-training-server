@@ -1,0 +1,18 @@
+# LendFast training API server — standalone (no Traefik).
+# For the NAS deployment with a real hostname, use compose.nas.yaml instead.
+services:
+  training-api:
+    build: .
+    container_name: training-api
+    ports:
+      - "8080:8080"
+    environment:
+      # Set this BEFORE first boot, or a random password is generated and shown once
+      # on the sign-in page. Change it later from the console.
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      RATE_LIMIT: "5000"
+      RATE_WINDOW_MINUTES: "15"
+    volumes:
+      # one SQLite file holds every instance, its keys and its data
+      - ./data:/data
+    restart: unless-stopped

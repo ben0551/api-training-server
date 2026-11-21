@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Training instances</h1>
+<p class="lede">Each instance is a completely separate sandbox: its own customers, loans, keys
+and request log. Participants get one URL and one set of keys.</p>
+
+<div class="grid" style="margin:18px 0">
+  <div class="stat"><b>{{ stats.active_instances }}</b><span>active instances</span></div>
+  <div class="stat"><b>{{ stats.keys_enabled }}</b><span>enabled API keys</span></div>
+  <div class="stat"><b>{{ stats.requests }}</b><span>requests logged</span></div>
+</div>
+
+<div class="between">
+  <h2 style="margin:0">All instances</h2>
+  <a class="btn primary" href="/admin/instances/new">Create an instance</a>
+</div>
+
+<table>
+  <tr>
+    <th>Instance</th><th>Share URL</th><th>Data</th><th>Keys</th>
+    <th>State</th><th>Last reset</th><th></th>
+  </tr>
+  {% for i in instances %}
+  <tr>
+    <td>
+      <a href="/admin/instances/{{ i.id }}"><b>{{ i.name }}</b></a><br>
+      <span class="dim mono">{{ i.slug }}</span>
+      {% if i.description %}<br><span class="dim">{{ i.description }}</span>{% endif %}
+    </td>
+    <td class="mono dim">/t/{{ i.slug }}</td>
+    <td class="dim">
+      {{ i.customers }} cust &middot; {{ i.applications }} apps<br>
+      {{ i.loans }} loans &middot; {{ i.payments }} pays
+    </td>
+    <td class="dim">{{ i.enabled_key_count }}/{{ i.key_count }} enabled</td>
+    <td>
+      {% if i.archived %}<span class="tag bad">archived</span>{% endif %}
+      {% if i.read_only %}<span class="tag warn">frozen</span>{% endif %}
+      {% if i.auto_reset_hours %}<span class="tag">auto-reset {{ i.auto_reset_hours }}h</span>{% endif %}
+      {% if not i.archived and not i.read_only and not i.auto_reset_hours %}<span class="tag ok">live</span>{% endif %}
+      {% if not i.show_keys %}<span class="tag">keys hidden</span>{% endif %}
+    </td>
+    <td class="dim">{{ i.last_reset_at[:16].replace('T',' ') }}</td>
+    <td><a class="btn small" href="/admin/instances/{{ i.id }}">Open</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% if not instances %}<div class="card">No instances yet. <a href="/admin/instances/new">Create the first one</a>.</div>{% endif %}
+{% endblock %}
