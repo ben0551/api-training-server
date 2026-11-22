@@ -1,0 +1,362 @@
+{
+  "info": {
+    "_postman_id": "e88b8a3c-09c7-42e9-843f-b5c70a69f6c2",
+    "name": "Public APIs — no sign-up, no key",
+    "description": "Practice APIs you can call from anywhere with no credentials. Useful for keeping the habit going after the course.\n\n* **frankfurter.dev** — daily foreign-exchange reference rates (ECB data)\n* **api.worldbank.org** — development and interest-rate indicators, paginated\n* **httpbin.org** — echoes your request back, so you can see exactly what you sent (headers, method, body, query)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "FX rates (frankfurter.dev)",
+      "item": [
+        {
+          "name": "Latest rates — AUD base",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.frankfurter.dev/v1/latest?base=AUD&symbols=USD,GBP,EUR",
+              "host": [
+                "https://api.frankfurter.dev/v1/latest"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "base",
+                  "value": "AUD"
+                },
+                {
+                  "key": "symbols",
+                  "value": "USD,GBP,EUR"
+                }
+              ]
+            },
+            "description": "Free, keyless, no rate limit worth worrying about. Great for a first 'this is a real API' moment."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"AUD is the base and rates came back\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.base).to.eql(\"AUD\");",
+                  "    pm.expect(b.rates).to.have.property(\"USD\");",
+                  "});",
+                  "pm.test(\"rates are plausible numbers\", () => {",
+                  "    Object.values(pm.response.json().rates)",
+                  "        .forEach(r => pm.expect(r).to.be.above(0));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A date range — EUR per AUD",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.frankfurter.dev/v1/2026-01-01..2026-11-20?base=AUD&symbols=EUR",
+              "host": [
+                "https://api.frankfurter.dev/v1/2026-01-01..2026-11-20"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "base",
+                  "value": "AUD"
+                },
+                {
+                  "key": "symbols",
+                  "value": "EUR"
+                }
+              ]
+            },
+            "description": "Historical series in one call. This is how a reconciliation flow would pick up the rate for a past settlement date."
+          },
+          "response": []
+        },
+        {
+          "name": "Supported currencies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.frankfurter.dev/v1/currencies",
+              "host": [
+                "https://api.frankfurter.dev/v1/currencies"
+              ],
+              "path": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Convert an amount",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.frankfurter.dev/v1/latest?amount=250000&base=AUD&symbols=USD",
+              "host": [
+                "https://api.frankfurter.dev/v1/latest"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "amount",
+                  "value": "250000"
+                },
+                {
+                  "key": "base",
+                  "value": "AUD"
+                },
+                {
+                  "key": "symbols",
+                  "value": "USD"
+                }
+              ]
+            },
+            "description": "Note the amount parameter — a difference of one query parameter changes the whole response."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "World Bank (paginated)",
+      "item": [
+        {
+          "name": "AU lending interest rate — page 1",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.worldbank.org/v2/country/AU/indicator/FR.INR.LEND?format=json&per_page=3&page=1",
+              "host": [
+                "https://api.worldbank.org/v2/country/AU/indicator/FR.INR.LEND"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "per_page",
+                  "value": "3"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Two things to notice: the response is an ARRAY of [metadata, results], not an object; and the metadata tells you there are 22 pages."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"metadata comes first, results second\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.be.an(\"array\");",
+                  "    pm.expect(b[0]).to.have.property(\"pages\");",
+                  "    pm.expect(b[1]).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"there is more than one page of data\", () => {",
+                  "    pm.expect(pm.response.json()[0].pages).to.be.above(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same indicator — page 2",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.worldbank.org/v2/country/AU/indicator/FR.INR.LEND?format=json&per_page=3&page=2",
+              "host": [
+                "https://api.worldbank.org/v2/country/AU/indicator/FR.INR.LEND"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "per_page",
+                  "value": "3"
+                },
+                {
+                  "key": "page",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Compare the dates with page 1. Paging simply moves the window."
+          },
+          "response": []
+        },
+        {
+          "name": "Multiple countries in one call",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.worldbank.org/v2/country/AUS;NZL;GBR/indicator/FR.INR.LEND?format=json&per_page=10",
+              "host": [
+                "https://api.worldbank.org/v2/country/AUS;NZL;GBR/indicator/FR.INR.LEND"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Semicolon-separated country codes. Worth comparing how a public API handles 'give me several things' versus your internal ones."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "httpbin — see your own request",
+      "item": [
+        {
+          "name": "GET — what did I actually send?",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Try removing this and sending again"
+              }
+            ],
+            "url": {
+              "raw": "https://httpbin.org/get?loan=LON-90001&status=ARREARS",
+              "host": [
+                "https://httpbin.org/get"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "loan",
+                  "value": "LON-90001"
+                },
+                {
+                  "key": "status",
+                  "value": "ARREARS"
+                }
+              ]
+            },
+            "description": "Delete the X-API-Key header, add your own junk headers, and send again. httpbin echoes everything back, which is the fastest way to find out what your client is really putting on the wire."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"our query parameters arrived intact\", () => {",
+                  "    pm.expect(pm.response.json().args).to.include.keys(\"loan\",\"status\");",
+                  "});",
+                  "pm.test(\"our custom header arrived\", () => {",
+                  "    pm.expect(pm.response.json().headers).to.have.property(\"X-Api-Key\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST — the body comes back",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://httpbin.org/post",
+              "host": [
+                "https://httpbin.org/post"
+              ],
+              "path": []
+            },
+            "description": "Body + headers echoed back, plus the exact Content-Type you sent.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"application_id\": \"APP-2026-000415\",\n  \"decision\": \"APPROVED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Choose the status code you get",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://httpbin.org/status/418",
+              "host": [
+                "https://httpbin.org/status/418"
+              ],
+              "path": []
+            },
+            "description": "I'm a teapot. A reminder that status codes are a language, and some of them have a sense of humour."
+          },
+          "response": []
+        },
+        {
+          "name": "Delayed response",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://httpbin.org/delay/3",
+              "host": [
+                "https://httpbin.org/delay/3"
+              ],
+              "path": []
+            },
+            "description": "Watch the timer in the corner. This is what a timeout looks like forming — useful when you set a flow's timeout in Course 2."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": []
+}

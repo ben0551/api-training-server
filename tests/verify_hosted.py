@@ -18,8 +18,9 @@ Run it before every training session:
 
     python3 tests/verify_hosted.py http://localhost:8080 --admin-password <pw>
 
-The course collections are looked for in ../api-training-course/postman, then in
-./tests/collections, then downloaded from the public GitHub repo.
+The course collections are looked for in ../api-training-course/postman (a sibling
+checkout), then in ./tests/collections — which carries a bundled copy, so this script
+works standalone. Keep that copy in step with the course repo when the collections change.
 """
 from __future__ import annotations
 
@@ -36,8 +37,6 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-COURSE_GITHUB = ("https://raw.githubusercontent.com/ben0551/"
-                 "api-fundamentals-finance-training/main/postman")
 
 PASS, FAIL = [], []
 
@@ -103,25 +102,17 @@ class Client:
 # --------------------------------------------------------------------------
 
 def find_collections() -> str:
-    candidates = [
-        os.path.join(os.path.dirname(REPO), "api-training-course", "postman"),
-        os.path.join(HERE, "collections"),
-    ]
-    for c in candidates:
-        if os.path.isfile(os.path.join(c, "Finance-API-Training.postman_collection.json")):
+    """A sibling course checkout wins (so a local edit is picked up); otherwise the
+    bundled copy in tests/collections, which makes this script standalone."""
+    wanted = "Finance-API-Training.postman_collection.json"
+    for c in (os.path.join(os.path.dirname(REPO), "api-training-course", "postman"),
+              os.path.join(HERE, "collections")):
+        if os.path.isfile(os.path.join(c, wanted)):
             return c
-    dest = os.path.join(HERE, "collections")
-    os.makedirs(dest, exist_ok=True)
-    print(f"  downloading the course collections into {dest} …")
-    for name in ("Finance-API-Training.postman_collection.json",
-                 "Public-APIs.postman_collection.json",
-                 "LendFast-Sandbox.postman_environment.json"):
-        try:
-            with urllib.request.urlopen(f"{COURSE_GITHUB}/{name}", timeout=25) as r:
-                open(os.path.join(dest, name), "wb").write(r.read())
-        except Exception as exc:
-            print(f"    could not fetch {name}: {exc}")
-    return dest
+    raise SystemExit(
+        "Could not find the course collections.\n"
+        "Either check out api-fundamentals-finance-training next to this repo, or copy\n"
+        "its postman/ folder into tests/collections/.")
 
 
 def run_collections(collections_dir: str, base_url: str) -> int:
@@ -267,13 +258,28 @@ def main() -> int:
           str(body.get("data", {}).get("balance")))
 
     # --- 9. isolation ------------------------------------------------------
-    others = [s for s in slugs if not s.startswith("verify-")]
-    other = f"{base}/t/{others[0]}" if others else None
-    if other:
-        code, body = anon.json("GET", f"{other}/v1/customers?page_size=100", headers=read)
-        check("another instance has its own data", code == 200, f"{body.get('meta', {}).get('total')} customers")
+    # Create a second instance rather than borrowing whatever else exists on the
+    # server: another instance may legitimately use its own keys, which would make
+    # this check fail for the wrong reason.
+    other_slug = slug + "-b"
+    code, _, hdrs2 = admin.request("POST", "/admin/instances",
+                                   data={"name": other_slug, "preset": "small",
+                                         "persistent": "1", "show_keys": "1",
+                                         "auto_reset_hours": "0"}, follow=False)
+    m2 = re.search(r"/admin/instances/(\d+)", hdrs2.get("location", ""))
+    other_id = int(m2.group(1)) if m2 else None
+    if other_id:
+        code, body_a = anon.json("GET", f"/t/{real_slug}/v1/customers?page_size=100", headers=read)
+        code_b, body_b = anon.json("GET", f"/t/{other_slug}/v1/customers?page_size=100", headers=read)
+        n_a = body_a.get("meta", {}).get("total")
+        n_b = body_b.get("meta", {}).get("total")
+        check("two instances hold separate data", code_b == 200 and n_a != n_b,
+              f"{n_a} customers vs {n_b}")
+        code, _ = anon.json("GET", f"/t/{other_slug}/v1/loans/LON-90003", headers=read)
+        check("a loan that exists in one instance is not in the other", code == 404, str(code))
+        admin.request("POST", f"/admin/instances/{other_id}/action", data={"action": "delete"})
     else:
-        check("instance isolation (only one instance exists, skipped)", True)
+        check("instance isolation", False, "could not create a second instance")
 
     # --- 10. archive ------------------------------------------------------
     admin.request("POST", f"/admin/instances/{instance_id}/action", data={"action": "archive"})

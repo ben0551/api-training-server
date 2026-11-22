@@ -1,0 +1,1574 @@
+{
+  "info": {
+    "_postman_id": "744417e4-df50-4278-bd0b-5c2c1e19315f",
+    "name": "Finance API Training — LendFast Sandbox",
+    "description": "Hands-on collection for the **API Fundamentals for Finance** half-day course.\n\n**Before you start:** import the *LendFast Sandbox* environment, select it in the top-right dropdown, and make sure the training API is running (`./run.sh` in the project folder).\n\nRequests are numbered to match the Lab Workbook and the slide deck.\n\n| Key | Who | Scope |\n|---|---|---|\n| demo-key-001 | Ava Nguyen | read — GET only |\n| demo-key-002 | Ben Fischer | write — GET, POST, PATCH |\n| demo-key-003 | Service Account | read |\n\nClient secret for `/oauth/token`: `training-secret`.\n\nNothing here touches real customer data or real money.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 · Before you start",
+      "item": [
+        {
+          "name": "4.1  Health check — no auth needed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}/health"
+              ],
+              "path": []
+            },
+            "description": "Is the service running? Do this first, every time. Try renaming the path to /healt to see a 404, then stop the server and send again to see a connection error."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"response is JSON\", () => pm.response.to.be.json);",
+                  "pm.test(\"service is the training API\", () => {",
+                  "    pm.expect(pm.response.json().service).to.eql(\"lendfast-training-api\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 · Lab 1 — Reading data (GET)",
+      "item": [
+        {
+          "name": "4.2  List customers — read key",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers?page=1&page_size=2",
+              "host": [
+                "{{baseUrl}}/v1/customers"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Your first authenticated call. After it lands, look at the Headers tab in the response: X-RateLimit-Remaining, X-Request-Id and X-Environment. Then disable the X-API-Key header and send again for a 401."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"paginated envelope\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property(\"meta\");",
+                  "    pm.expect(b).to.have.property(\"data\");",
+                  "    pm.expect(b.meta.total).to.be.above(0);",
+                  "    pm.expect(b.data).to.be.an(\"array\").that.is.not.empty;",
+                  "});",
+                  "pm.test(\"rate-limit headers are present\", () => {",
+                  "    pm.expect(pm.response.headers.has(\"X-RateLimit-Remaining\")).to.be.true;",
+                  "    pm.expect(pm.response.headers.has(\"X-Request-Id\")).to.be.true;",
+                  "});",
+                  "pm.test(\"page size respected\", () => {",
+                  "    pm.expect(pm.response.json().data.length).to.be.at.most(2);",
+                  "});",
+                  "// Save the first customer id for later requests",
+                  "const first = pm.response.json().data[0];",
+                  "if (first) { pm.environment.set(\"customerId\", first.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.2b  Watch it fail — no API key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers?page=1&page_size=2",
+              "host": [
+                "{{baseUrl}}/v1/customers"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "401 MISSING_API_KEY. The error body spells out which header is missing."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"the error names the missing header\", () => {",
+                  "    pm.expect(JSON.stringify(pm.response.json())).to.include(\"X-API-Key\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3  Filter and page — Params tab",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers",
+              "host": [
+                "{{baseUrl}}/v1/customers"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "2"
+                },
+                {
+                  "key": "state",
+                  "value": "NSW"
+                },
+                {
+                  "key": "min_credit_score",
+                  "value": "700"
+                },
+                {
+                  "key": "sort",
+                  "value": "credit_score"
+                },
+                {
+                  "key": "fields",
+                  "value": "id,surname,state,credit_score"
+                }
+              ]
+            },
+            "description": "Open the Params tab: each row is one query parameter. Every result should be in NSW and scoring 700+."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"only NSW customers came back\", () => {",
+                  "    pm.response.json().data.forEach(c => pm.expect(c.state).to.eql(\"NSW\"));",
+                  "});",
+                  "pm.test(\"only the fields we asked for came back\", () => {",
+                  "    const keys = Object.keys(pm.response.json().data[0]).sort();",
+                  "    pm.expect(keys).to.eql([\"credit_score\",\"id\",\"state\",\"surname\"]);",
+                  "});",
+                  "pm.test(\"credit score filter held\", () => {",
+                  "    pm.response.json().data.forEach(c => pm.expect(c.credit_score).to.be.at.least(700));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3b  Deliberate mistake — unsupported sort",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers?sort=-credit_score",
+              "host": [
+                "{{baseUrl}}/v1/customers"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "-credit_score"
+                }
+              ]
+            },
+            "description": "A 400, not a crash. The error names the offending parameter. This is what a well-built API does when you ask for something it cannot do."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"the error explains itself\", () => {",
+                  "    pm.expect(pm.response.json().detail.code).to.eql(\"UNKNOWN_SORT_FIELD\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3c  Page out of range",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers?page=99&page_size=2",
+              "host": [
+                "{{baseUrl}}/v1/customers"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "99"
+                },
+                {
+                  "key": "page_size",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "400 PAGE_OUT_OF_RANGE — another self-explaining error."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.4  Second page — follow the next link",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers?page=2&page_size=2&sort=surname",
+              "host": [
+                "{{baseUrl}}/v1/customers"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "2"
+                },
+                {
+                  "key": "page_size",
+                  "value": "2"
+                },
+                {
+                  "key": "sort",
+                  "value": "surname"
+                }
+              ]
+            },
+            "description": "Copy the meta.next value from request 4.3 and paste it in the URL bar. That is what 'follow the pagination links' means in practice."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"meta.page is 2\", () => pm.expect(pm.response.json().meta.page).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.5a  Follow the links — pick an application",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications?status=IN_REVIEW,REFERRED",
+              "host": [
+                "{{baseUrl}}/v1/applications"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "IN_REVIEW,REFERRED"
+                }
+              ]
+            },
+            "description": "Find APP-2026-000413, then copy its customer_id into the customerId environment variable (or use the test below, which does it for you)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json().data;",
+                  "if (rows.length) {",
+                  "    pm.environment.set(\"customerId\", rows[0].customer_id);",
+                  "    pm.environment.set(\"appId\", rows[0].id);",
+                  "    console.log(\"captured\", rows[0].id, \"for\", rows[0].customer_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.5b  The customer behind it",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}/v1/customers/{{customerId}}"
+              ],
+              "path": []
+            },
+            "description": "One call, and you get the customer, a summary (active loans, total balance) and links to everything related. This is how real integrations chain calls."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"a summary came back with the record\", () => {",
+                  "    pm.expect(pm.response.json()).to.have.property(\"summary\");",
+                  "    pm.expect(pm.response.json()).to.have.property(\"links\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.5c  Their loans",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/loans?customer_id={{customerId}}",
+              "host": [
+                "{{baseUrl}}/v1/loans"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "customer_id",
+                  "value": "{{customerId}}"
+                }
+              ]
+            },
+            "description": "Balances, arrears status, repayment amount."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json().data;",
+                  "if (rows.length) { pm.environment.set(\"loanId\", rows[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.5d  A 404 on purpose",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers/CUS-999999",
+              "host": [
+                "{{baseUrl}}/v1/customers/CUS-999999"
+              ],
+              "path": []
+            },
+            "description": "404 CUSTOMER_NOT_FOUND. Note the code field — match on codes, not on human-readable messages, which change."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"the error carries a machine-readable code\", () => {",
+                  "    pm.expect(pm.response.json().detail.code).to.eql(\"CUSTOMER_NOT_FOUND\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 · Lab 2 — Writing data (POST/PATCH)",
+      "item": [
+        {
+          "name": "5.1  POST a new loan application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "WRITE key — demo-key-002. demo-key-001 gives 403."
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "lab2-app-001",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications",
+              "host": [
+                "{{baseUrl}}/v1/applications"
+              ],
+              "path": []
+            },
+            "description": "The X-API-Key here is {{writeKey}}. Swap it to {{apiKey}} to see the 403 from a read-only key.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"CUS-100005\",\n  \"product\": \"Personal Loan\",\n  \"amount\": 15000,\n  \"term_months\": 48,\n  \"purpose\": \"Car\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"the Location header points at the new record\", () => {",
+                  "    pm.expect(pm.response.headers.has(\"Location\")).to.be.true;",
+                  "});",
+                  "const b = pm.response.json();",
+                  "pm.test(\"the API echoed back our payload, plus a new id\", () => {",
+                  "    pm.expect(b.data.id).to.match(/^APP-2026-/);",
+                  "    pm.expect(b.data.amount).to.eql(15000);",
+                  "    pm.expect(b.data.status).to.eql(\"SUBMITTED\");",
+                  "});",
+                  "if (b.data && b.data.id) { pm.environment.set(\"newAppId\", b.data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.3a  Validation — remove customer_id",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications",
+              "host": [
+                "{{baseUrl}}/v1/applications"
+              ],
+              "path": []
+            },
+            "description": "422 with loc:[body,customer_id] and msg:Field required. The loc array tells you exactly where the problem is.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product\": \"Personal Loan\",\n  \"amount\": 15000,\n  \"term_months\": 48,\n  \"purpose\": \"Car\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"the error points at the missing field\", () => {",
+                  "    pm.expect(JSON.stringify(pm.response.json())).to.include(\"customer_id\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.3b  Validation — values outside the rules",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications",
+              "host": [
+                "{{baseUrl}}/v1/applications"
+              ],
+              "path": []
+            },
+            "description": "422 — two violations at once. amount must be > 1000, term_months >= 6.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"CUS-100001\",\n  \"product\": \"Personal Loan\",\n  \"amount\": 500,\n  \"term_months\": 4,\n  \"purpose\": \"Car\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"both violations reported\", () => {",
+                  "    const d = pm.response.json().detail;",
+                  "    pm.expect(d.length).to.be.at.least(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.3c  Validation — a customer who does not exist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications",
+              "host": [
+                "{{baseUrl}}/v1/applications"
+              ],
+              "path": []
+            },
+            "description": "422 CUSTOMER_NOT_FOUND with a hint telling you what to do instead.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"CUS-999999\",\n  \"product\": \"Personal Loan\",\n  \"amount\": 15000,\n  \"term_months\": 48,\n  \"purpose\": \"Car\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.4a  PATCH the status — move the workflow on",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications/{{appId}}/status",
+              "host": [
+                "{{baseUrl}}/v1/applications/{{appId}}/status"
+              ],
+              "path": []
+            },
+            "description": "PATCH changes part of a record; PUT would replace all of it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_REVIEW\",\n  \"note\": \"Docs received\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the status actually changed\", () => {",
+                  "    pm.expect(pm.response.json().data.status).to.eql(\"IN_REVIEW\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.4b  A 409 — the guard rail",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications/APP-2026-000411/status",
+              "host": [
+                "{{baseUrl}}/v1/applications/APP-2026-000411/status"
+              ],
+              "path": []
+            },
+            "description": "APP-2026-000411 is already APPROVED. 409 is not a bug: it is the API protecting a business rule. Re-GET the record before you retry.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DECLINED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"the error names the conflict\", () => {",
+                  "    pm.expect(pm.response.json().detail.code).to.eql(\"INVALID_STATE_TRANSITION\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.5a  POST a repayment — with an idempotency key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKey}}",
+                "type": "text",
+                "description": "A unique id YOU generate for this intent. Reuse it to make a retry safe."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/loans/{{loanId}}/payments",
+              "host": [
+                "{{baseUrl}}/v1/loans/{{loanId}}/payments"
+              ],
+              "path": []
+            },
+            "description": "Send once: 201 with replayed:false. Send again with the same key: 200 with Idempotency-Replayed: true and no second payment. Change the key and the payment really is made again.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500,\n  \"method\": \"BPAY\",\n  \"reference\": \"EXTRA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"first send creates the payment\", () => {",
+                  "    pm.expect([200,201]).to.include(pm.response.code);",
+                  "});",
+                  "const b = pm.response.json();",
+                  "pm.test(\"we know whether this was a replay\", () => {",
+                  "    pm.expect(b).to.have.property(\"replayed\");",
+                  "});",
+                  "console.log(b.replayed ? \"REPLAY - no second payment taken\" : \"new payment created\");",
+                  "console.log(\"loan balance now\", b.loan && b.loan.new_balance);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.5b  Same key again — prove the replay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/loans/{{loanId}}/payments",
+              "host": [
+                "{{baseUrl}}/v1/loans/{{loanId}}/payments"
+              ],
+              "path": []
+            },
+            "description": "Identical request, second time. Watch the Idempotency-Replayed response header.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500,\n  \"method\": \"BPAY\",\n  \"reference\": \"EXTRA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"replay returns 200, not 201\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"marked as a replay\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Idempotency-Replayed\")).to.eql(\"true\");",
+                  "    pm.expect(pm.response.json().replayed).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.5c  Payment larger than the balance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{writeKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/loans/LON-90003/payments",
+              "host": [
+                "{{baseUrl}}/v1/loans/LON-90003/payments"
+              ],
+              "path": []
+            },
+            "description": "LON-90003 is a personal loan with roughly $14.9k outstanding, so a $99,000 payment cannot be valid. 422 AMOUNT_EXCEEDS_BALANCE — a business rule, enforced by the API rather than by a spreadsheet someone maintains.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 99000,\n  \"method\": \"TRANSFER\",\n  \"reference\": \"TOO MUCH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.6a  401 — a key that does not exist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "not-a-real-key",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers",
+              "host": [
+                "{{baseUrl}}/v1/customers"
+              ],
+              "path": []
+            },
+            "description": "401 INVALID_API_KEY."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.6b  403 — right key, wrong scope",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "A READ-only key, used on a write endpoint"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications",
+              "host": [
+                "{{baseUrl}}/v1/applications"
+              ],
+              "path": []
+            },
+            "description": "401 = I do not know you. 403 = I know you, and you still may not do that. Learn the difference now; it saves an hour of confusion later.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"CUS-100001\",\n  \"product\": \"Personal Loan\",\n  \"amount\": 15000,\n  \"term_months\": 48,\n  \"purpose\": \"Car\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"scope problem, not an identity problem\", () => {",
+                  "    pm.expect(pm.response.json().detail.code).to.eql(\"INSUFFICIENT_SCOPE\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.6c  OAuth2 client credentials — get a token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/oauth/token",
+              "host": [
+                "{{baseUrl}}/oauth/token"
+              ],
+              "path": []
+            },
+            "description": "The formal, production-grade version of an API key. The reply carries an access_token with an expiry, which then travels as Authorization: Bearer <token>.\n\nThis request takes client_id and client_secret from the environment ({{writeKey}} and {{clientSecret}}), so it keeps working when a cohort uses its own keys.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"{{writeKey}}\",\n  \"client_secret\": \"{{clientSecret}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a token\", () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"token has a type and an expiry\", () => {",
+                  "    pm.expect(b.token_type).to.eql(\"Bearer\");",
+                  "    pm.expect(b.expires_in).to.be.above(0);",
+                  "});",
+                  "pm.test(\"we can see what the token may do\", () => {",
+                  "    pm.expect(b.scope).to.eql(\"write\");",
+                  "});",
+                  "if (b.access_token) { pm.environment.set(\"bearerToken\", b.access_token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.6d  Use the bearer token instead of the key",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/customers?page_size=1",
+              "host": [
+                "{{baseUrl}}/v1/customers"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "page_size",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Run 5.6c first — this request picks up the token it saved. In the real world you would refresh it before it expires."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"the token was accepted\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.7a  Simulate a 429 — rate limited",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/_simulate/status/429",
+              "host": [
+                "{{baseUrl}}/v1/_simulate/status/429"
+              ],
+              "path": []
+            },
+            "description": "Read the Retry-After header. Correct behaviour: wait, retry, then back off exponentially. Wrong behaviour: retry in a tight loop."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 429\", () => pm.response.to.have.status(429));",
+                  "pm.test(\"the server told us when to come back\", () => {",
+                  "    pm.expect(pm.response.headers.has(\"Retry-After\")).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.7b  Simulate a 500 — their fault",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/_simulate/status/500",
+              "host": [
+                "{{baseUrl}}/v1/_simulate/status/500"
+              ],
+              "path": []
+            },
+            "description": "Note the reference. That is what you quote in a support ticket."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 500\", () => pm.response.to.have.status(500));",
+                  "pm.test(\"there is a traceable reference\", () => {",
+                  "    pm.expect(pm.response.json().error.reference).to.match(/^ERR-/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.7c  Simulate a 503 — downstream offline",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/_simulate/status/503",
+              "host": [
+                "{{baseUrl}}/v1/_simulate/status/503"
+              ],
+              "path": []
+            },
+            "description": "Retry with backoff. This is the one that makes automation look unreliable when nobody handles it."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"we got a 503\", () => pm.response.to.have.status(503));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.8  Assertions — what a real test looks like",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/applications?status=APPROVED,DECLINED&page_size=5",
+              "host": [
+                "{{baseUrl}}/v1/applications"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "APPROVED,DECLINED"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Open the Tests tab and read what these four assertions check: the status code, the shape of the envelope, the business content, and the rate-limit headroom. Then run the whole folder with the collection runner."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the envelope has meta and data\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.meta).to.include.keys(\"page\",\"page_size\",\"total\",\"total_pages\");",
+                  "});",
+                  "pm.test(\"every row really is decided\", () => {",
+                  "    pm.response.json().data.forEach(a =>",
+                  "        pm.expect([\"APPROVED\",\"DECLINED\"]).to.include(a.status));",
+                  "});",
+                  "pm.test(\"we are not close to the rate limit\", () => {",
+                  "    pm.expect(Number(pm.response.headers.get(\"X-RateLimit-Remaining\"))).to.be.above(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 · Module 6 — Patterns, reporting, webhooks",
+      "item": [
+        {
+          "name": "6.1  Portfolio summary — a reporting API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/reports/portfolio-summary?group_by=state",
+              "host": [
+                "{{baseUrl}}/v1/reports/portfolio-summary"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "group_by",
+                  "value": "state"
+                }
+              ]
+            },
+            "description": "Compare this with the operational endpoints: same auth, same JSON, but it answers a different kind of question (an aggregate, not a record). Try group_by=product and group_by=status."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"it is an aggregate, not a record list\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.meta).to.have.property(\"totals\");",
+                  "    pm.expect(b.data[0]).to.have.property(\"balance\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.2  Amortisation schedule",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/loans/{{loanId}}/schedule?months=6",
+              "host": [
+                "{{baseUrl}}/v1/loans/{{loanId}}/schedule"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "months",
+                  "value": "6"
+                }
+              ]
+            },
+            "description": "Interest and principal split per instalment. This is the sort of calculation you should never re-implement in a spreadsheet if the API already does it."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the maths holds: interest + principal = repayment\", () => {",
+                  "    pm.response.json().data.forEach(r => {",
+                  "        pm.expect(Math.abs((r.interest + r.principal) - r.total_repayment))",
+                  "          .to.be.below(0.02);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.3  Repayment history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/loans/{{loanId}}/payments",
+              "host": [
+                "{{baseUrl}}/v1/loans/{{loanId}}/payments"
+              ],
+              "path": []
+            },
+            "description": "Pagination and a total. Read meta, not just data."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.4  See what a webhook would send you",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/_simulate/webhook",
+              "host": [
+                "{{baseUrl}}/v1/_simulate/webhook"
+              ],
+              "path": []
+            },
+            "description": "Nothing is actually sent — this shows you the shape of the outbound call the bank makes when a decision lands. Note the signature header: verify it before trusting the body.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"application_id\": \"APP-2026-000415\",\n  \"callback_url\": \"https://webhook.site/replace-with-your-url\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"the payload has an event, an id and a signature\", () => {",
+                  "    pm.expect(b.body.event).to.eql(\"application.decision.ready\");",
+                  "    pm.expect(b.headers).to.have.property(\"X-LendFast-Signature\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.5  What the server saw — the audit trail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Your training API key"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/_audit",
+              "host": [
+                "{{baseUrl}}/v1/_audit"
+              ],
+              "path": []
+            },
+            "description": "Every authenticated call you have made in this session, with method, path and status. In production, this log is how an incident gets reconstructed."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"our own calls are in there\", () => {",
+                  "    pm.expect(pm.response.json().count).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ]
+}

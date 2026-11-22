@@ -69,11 +69,14 @@ def authenticate(request: Request, instance: dict, x_api_key: str | None,
                     headers={"WWW-Authenticate": "Bearer"})
 
     if not resolved:
+        read_key = _first_key(instance, "read")
         raise HTTPException(
             status_code=401,
             detail={"code": "MISSING_API_KEY",
                     "message": "Send your API key in the X-API-Key header.",
-                    "hint": "In Postman: Headers tab -> X-API-Key -> demo-key-001"},
+                    "hint": (f"In Postman: Headers tab -> X-API-Key -> {read_key}"
+                             if read_key else
+                             "Ask your facilitator for this instance's API key.")},
             headers={"WWW-Authenticate": "ApiKey"})
 
     row = db.find_key(instance["id"], resolved)
@@ -96,15 +99,26 @@ def authenticate(request: Request, instance: dict, x_api_key: str | None,
                 "message": "This training instance is in read-only mode right now.",
                 "hint": "The facilitator can unfreeze it from the admin console."})
         if row["scope"] != "write":
+            write_key = _first_key(instance, "write")
             raise HTTPException(status_code=403, detail={
                 "code": "INSUFFICIENT_SCOPE",
                 "message": f"{row['label'] or 'This key'} holds a '{row['scope']}' key. "
                            f"Writing needs a 'write' key.",
-                "hint": "Try X-API-Key: demo-key-002"})
+                "hint": (f"Try X-API-Key: {write_key}" if write_key
+                         else "Ask your facilitator for a write key.")})
 
     db.touch_key(instance["id"], resolved)
     request.state.key_label = row["label"] or row["key"][:12]
     return row
+
+
+def _first_key(instance: dict, scope: str) -> str | None:
+    """Name this instance's own key in an error hint, so a cohort using custom keys is
+    never told to try one that does not exist."""
+    for key in db.list_keys(instance["id"]):
+        if key["enabled"] and key["scope"] == scope:
+            return key["key"]
+    return None
 
 
 def paginate(items: list[dict], page: int, page_size: int, *, base: str, query: dict) -> dict:
