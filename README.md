@@ -63,6 +63,17 @@ collection** against it, exercises key disabling, freezing, resetting, isolation
 archiving, then deletes the instance. `23 passed, 0 failed` is what you want to see. Run
 it after every deploy and before every session.
 
+Verified against the built image: the container comes up healthy, the full verification
+passes against it, and instances, keys, data, idempotency records and the request log all
+survive a `docker restart`.
+
+**Two things that will catch you out testing from another container:**
+
+- A published port lives on the **docker host**, so `127.0.0.1:<port>` inside a different
+  container is not it. Use the docker gateway: `http://172.31.0.1:<port>`.
+- Port 8080 and 8099 are already taken on this host by other containers. Pick a free one
+  before publishing — `docker ps --format '{{.Names}}\t{{.Ports}}'`.
+
 ---
 
 ## Deploying on the NAS (behind Traefik)
