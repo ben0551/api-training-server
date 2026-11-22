@@ -24,7 +24,13 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import admin, api, db
+from .env import load_dotenv
+
+# Load .env before anything reads a setting — db reads DATA_DIR at import time, so this
+# has to happen first. Real environment variables always win over the file.
+load_dotenv()
+
+from . import admin, api, db  # noqa: E402  (must come after the env is loaded)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
