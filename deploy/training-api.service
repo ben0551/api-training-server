@@ -1,0 +1,25 @@
+[Unit]
+Description=LendFast training API server
+Documentation=https://github.com/ben0551/api-training-server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/api-training-server
+EnvironmentFile=/etc/api-training.env
+ExecStart=/opt/api-training-server/.venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port 8080 --proxy-headers --forwarded-allow-ips='*'
+Restart=always
+RestartSec=3
+
+# the SQLite database and its WAL sidecar live here
+ReadWritePaths=/var/lib/api-training
+ProtectSystem=full
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

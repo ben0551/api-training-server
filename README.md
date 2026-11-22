@@ -39,12 +39,15 @@ cd api-training-server
 
 # set the console password BEFORE first boot, or one is generated and shown once
 export ADMIN_PASSWORD='a-long-password-you-will-remember'
-docker compose up -d --build
 
-# or without Docker
 pip install -r requirements.txt
-ADMIN_PASSWORD='...' python3 -m uvicorn app.main:app --port 8080
+python3 -m uvicorn app.main:app --port 8080
+
+# or, locally, with Docker
+docker compose up -d --build
 ```
+
+For a real webhost, see **Deploying to your webhost** below.
 
 Then:
 
@@ -76,43 +79,49 @@ survive a `docker restart`.
 
 ---
 
-## Deploying on the NAS (behind Traefik)
+## Deploying to your webhost
 
-`compose.nas.yaml` is set up for the house conventions: stack at
-`/Volume1/docker/.stacks/zozac/training-api`, data at `/Volume1/docker/training-api`
-(a directory named after the container, not a named volume), joined to `traefik_default`.
+The server is a plain Python application. Two paths, both verified:
+
+| Your host | Path | Guide |
+| --- | --- | --- |
+| Shared hosting with cPanel "Setup Python App", or Plesk | Passenger over **WSGI** — no port to open, no process to babysit | `deploy/cpanel.md` |
+| A VPS or dedicated server you control | **uvicorn** behind nginx, managed by systemd | `deploy/vps.md` |
+
+FastAPI is an ASGI framework, so the shared-hosting path bridges to WSGI with `a2wsgi`
+(`app/wsgi.py`, and `passenger_wsgi.py` for Passenger). **That path is tested, not just
+documented**: the whole application was run under a WSGI server and the full end-to-end
+verification passed against it — 24 checks including the complete 44-request course
+collection.
+
+What you need to get right on either path:
+
+- **`ADMIN_PASSWORD`** — set it before the first boot, or a random one is generated and
+  shown once on the sign-in page. Put it in the host's environment variables, or in a
+  `.env` file next to the project (`chmod 600`); the app reads one, and a real environment
+  variable always wins over the file.
+- **`DATA_DIR`** — where the SQLite database lives. On shared hosting this must be
+  **outside `public_html`** and writable. Create it before the first start.
+- **The document root must not be the project directory.** Nothing in the repo should be
+  web-readable; only the app should be served.
+
+Then verify the deployment for real, from your own machine:
 
 ```bash
-# 1. create the stack directory and the data directory on the host
-#    (a missing bind source becomes a root-owned empty dir and the app boots half-initialised)
-
-# 2. put compose.yaml and .env (ADMIN_PASSWORD=...) in the stack directory,
-#    editing the Host() rule to your hostname
-
-# 3. deploy through a throwaway container that mounts the host path, so compose
-#    resolves the bind mounts against the host filesystem
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /Volume1/docker/.stacks/zozac/training-api:/Volume1/docker/.stacks/zozac/training-api \
-  -w /Volume1/docker/.stacks/zozac/training-api \
-  docker:cli compose -p training-api up -d --build
+python3 tests/verify_hosted.py https://training.zozac.com.au --admin-password '<password>'
 ```
 
-Then verify from inside the docker network:
+`24 passed, 0 failed` means it is genuinely working. Anything else, read the host's error
+log — on cPanel that is `stderr.log` in the application root.
 
-```bash
-docker run --rm --network traefik_default curlimages/curl:latest \
-  -sk -o /dev/null -w "%{http_code}\n" -H "Host: <your-hostname>" https://traefik/
-```
+> **Protect `/admin`.** If the domain is internet-reachable, the console can create
+> instances, read every key and delete data. Put the host's own protection in front of
+> `/admin` — cPanel's *Directory Privacy* or an `.htaccess` allow-list, or the nginx block
+> in `deploy/nginx.conf.example` — and leave `/t/` public for participants. The console
+> refuses to run with no password at all for this reason.
 
-> **Read this before exposing it.** A `*.l.zozac.com.au` route resolves to the WAN IP, so
-> if anything forwards 443 the service is **public**. That is fine for the training API —
-> the data is fictional and the keys are meant to be handed out — but the **console**
-> creates and deletes instances and displays every key. Set a strong `ADMIN_PASSWORD`,
-> and consider putting a LAN-only middleware (`localauth@file`) on the `/admin` router, or
-> a separate router rule that exposes only `/t/` publicly. The console refuses to run with
-> no password at all for this reason.
+`docker-compose.yml` is still in the repo for **local development only**.
 
----
 
 ## Multi-tenancy: why a path prefix
 
@@ -281,18 +290,28 @@ instance's actual request count in the current window, so the course's
 
 ```
 app/
-  main.py         app assembly, instance headers middleware, share page
-  api.py          the 15 endpoints, per-instance
-  admin.py        the console (server-rendered, plain forms)
-  db.py           SQLite schema and data access
-  seed.py         the standard/small/large datasets + validation
-  templates/      Jinja2 templates
-  static/         one stylesheet
+  main.py          app assembly, instance headers middleware, share page
+  api.py           the 15 endpoints, per-instance
+  admin.py         the console (server-rendered, plain forms)
+  db.py            SQLite schema and data access
+  seed.py          the standard/small/large datasets + validation
+  env.py           .env loader (real environment variables win)
+  wsgi.py          ASGI -> WSGI bridge for shared hosting
+  templates/       Jinja2 templates
+  static/          one stylesheet
+passenger_wsgi.py  entrypoint for cPanel / Plesk / Passenger
+deploy/
+  cpanel.md            shared-hosting walkthrough
+  vps.md               own-server walkthrough
+  training-api.service systemd unit
+  nginx.conf.example   reverse proxy, with a /admin lock-down block
 tests/
-  verify_hosted.py  end-to-end verification against a running server
-Dockerfile
-docker-compose.yml        standalone
-compose.nas.yaml          NAS deployment behind Traefik
+  verify_hosted.py     end-to-end verification against a running server
+  collections/         a copy of the course collections, so the tests are standalone
+Dockerfile             for local development
+docker-compose.yml     for local development
+requirements.txt         native hosting (uvicorn)
+requirements-webhost.txt WSGI hosting (no uvicorn, adds a2wsgi)
 ```
 
 ---

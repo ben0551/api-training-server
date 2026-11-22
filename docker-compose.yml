@@ -1,5 +1,5 @@
-# LendFast training API server — standalone (no Traefik).
-# For the NAS deployment with a real hostname, use compose.nas.yaml instead.
+# LendFast training API server — local development.
+# For a real webhost, see deploy/cpanel.md (shared hosting) or deploy/vps.md (own server).
 services:
   training-api:
     build: .
